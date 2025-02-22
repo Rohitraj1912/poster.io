@@ -1,0 +1,50 @@
+/* Header.css */
+.Header {
+    background-color: #1976d2;
+    padding: 8px;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  
+  .Header-title {
+    font-size: 20px;
+    font-weight: bold;
+    color: white;
+  }
+  
+  .Header-buttons {
+    display: flex;
+    gap: 10px;
+  }
+  
+  .Header-button {
+    color: white;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 6px 12px;
+    transition: background 0.3s ease-in-out;
+    border: none;
+    cursor: pointer;
+  }
+  
+  .Header-button:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+  
+  .icon-button {
+    color: white;
+    transition: transform 0.2s ease-in-out;
+  }
+  
+  .icon-button:hover {
+    transform: scale(1.1);
+  }
+  
+  .header-left, .header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
