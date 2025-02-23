@@ -1,13 +1,11 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { List, ListItem, ListItemIcon, Collapse, Button } from "@mui/material";
 import Draggable from "react-draggable";
-
-// Icons
-import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile"; // Template
-import TextFieldsIcon from "@mui/icons-material/TextFields"; // Text
-import CloudUploadIcon from "@mui/icons-material/CloudUpload"; // Upload
-import CategoryIcon from "@mui/icons-material/Category"; // Shapes
-import GestureIcon from "@mui/icons-material/Gesture"; // Draw
+import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
+import TextFieldsIcon from "@mui/icons-material/TextFields";
+import CloudUploadIcon from "@mui/icons-material/CloudUpload";
+import CategoryIcon from "@mui/icons-material/Category";
+import GestureIcon from "@mui/icons-material/Gesture";
 
 import "./workspace.css";
 
@@ -25,7 +23,7 @@ const sidebarOptions = [
   {
     icon: CloudUploadIcon,
     label: "Upload",
-    options: ["Upload Image", "Upload SVG", "Upload PDF"],
+    options: ["Upload Image"],
   },
   {
     icon: CategoryIcon,
@@ -43,55 +41,105 @@ const Workspace = () => {
   const [activeMenu, setActiveMenu] = useState(null);
   const [elements, setElements] = useState([]);
   const [selectedElement, setSelectedElement] = useState(null);
-
-  // Zoom State
   const [scale, setScale] = useState(1);
+  const [editingText, setEditingText] = useState(null);
+  const fileInputRef = useRef(null);
+  const textRef = useRef(null);
+
   const handleZoomIn = () => setScale((prev) => Math.min(prev + 0.1, 2));
   const handleZoomOut = () => setScale((prev) => Math.max(prev - 0.1, 0.5));
 
-  // Handle Sidebar Click
   const handleMenuToggle = (index) => {
     setActiveMenu(activeMenu === index ? null : index);
   };
 
-  // Add Text Element
   const addTextElement = (type) => {
     const textOptions = {
-      "Add Title": { text: "Title", fontSize: 32 },
-      "Add Subtitle": { text: "Subtitle", fontSize: 24 },
-      "Add Paragraph": { text: "Your text here", fontSize: 18 },
+      "Add Title": { text: "Title", className: "title", type: "text" },
+      "Add Subtitle": { text: "Subtitle", className: "subtitle", type: "text" },
+      "Add Paragraph": { text: "Your text here", className: "paragraph", type: "text" },
     };
 
     if (textOptions[type]) {
-      setElements([
-        ...elements,
-        { id: Date.now(), ...textOptions[type], x: 50, y: 50, nodeRef: React.createRef(), isEditing: false },
-      ]);
+      const newElement = {
+        id: Date.now(),
+        ...textOptions[type],
+        x: 50,
+        y: 50,
+        nodeRef: { current: null },
+      };
+      setElements((prevElements) => [...prevElements, newElement]);
+      setSelectedElement(newElement.id);
+      setEditingText(newElement.id);
     }
   };
 
-  // Handle text selection
-  const handleSelectElement = (id) => {
+  const handleImageUpload = (event) => {
+    const files = Array.from(event.target.files);
+    
+    const newImages = files.map((file) => ({
+      id: Date.now() + Math.random(),
+      type: "image",
+      src: URL.createObjectURL(file),
+      width: 200,
+      height: 200,
+      x: Math.random() * 300,
+      y: Math.random() * 300,
+      nodeRef: { current: null },
+    }));
+
+    setElements((prevElements) => [...prevElements, ...newImages]);
+    event.target.value = null;
+  };
+
+  const handleSelectElement = (id, e) => {
+    e.stopPropagation();
     setSelectedElement(id);
   };
 
-  // Handle text change
   const handleTextChange = (id, newText) => {
-    setElements(elements.map((el) => (el.id === id ? { ...el, text: newText } : el)));
+    setElements((prevElements) =>
+      prevElements.map((el) => (el.id === id ? { ...el, text: newText } : el))
+    );
   };
 
-  // Handle keypress for delete functionality
+  const handleTextDoubleClick = (id, e) => {
+    e.stopPropagation();
+    setEditingText(id);
+  };
+
+  const handleTextBlur = () => {
+    setEditingText(null);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      e.target.blur();
+    }
+  };
+
   useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (textRef.current && !textRef.current.contains(e.target)) {
+        setEditingText(null);
+      }
+    };
+
     const handleKeyDown = (event) => {
-      if (event.key === "Delete" && selectedElement !== null) {
-        setElements(elements.filter((el) => el.id !== selectedElement));
+      if (event.key === "Delete" && selectedElement !== null && !editingText) {
+        setElements((prevElements) => prevElements.filter((el) => el.id !== selectedElement));
         setSelectedElement(null);
       }
     };
 
+    document.addEventListener("mousedown", handleClickOutside);
     document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [selectedElement, elements]);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [selectedElement, editingText]);
 
   return (
     <div className="workspace">
@@ -106,11 +154,15 @@ const Workspace = () => {
                 </ListItemIcon>
               </ListItem>
 
-              {/* Submenu */}
               <Collapse in={activeMenu === index} timeout="auto" unmountOnExit>
                 <List className="submenu">
                   {options.map((option, subIndex) => (
-                    <ListItem button key={subIndex} className="submenu-item" onClick={() => addTextElement(option)}>
+                    <ListItem
+                      button
+                      key={subIndex}
+                      className="submenu-item"
+                      onClick={() => (option === "Upload Image" ? fileInputRef.current.click() : addTextElement(option))}
+                    >
                       {option}
                     </ListItem>
                   ))}
@@ -119,41 +171,83 @@ const Workspace = () => {
             </div>
           ))}
         </List>
+
+        <input
+          type="file"
+          ref={fileInputRef}
+          style={{ display: "none" }}
+          accept="image/*"
+          multiple
+          onChange={handleImageUpload}
+        />
       </div>
 
       {/* Canvas */}
       <div className="canvas-container">
-        {/* Zoom Controls */}
         <div className="zoom-controls">
           <Button onClick={handleZoomOut}>-</Button>
           <span>{(scale * 100).toFixed(0)}%</span>
           <Button onClick={handleZoomIn}>+</Button>
         </div>
 
-        {/* A4 Canvas */}
         <div className="canvas" style={{ transform: `scale(${scale})` }}>
           <h2>Design Your Poster Here</h2>
 
-          {/* Draggable Text Elements */}
           {elements.map((el) => (
             <Draggable
               key={el.id}
               nodeRef={el.nodeRef}
               defaultPosition={{ x: el.x, y: el.y }}
-              onStop={() => setSelectedElement(el.id)}
+              disabled={editingText === el.id}
+              onStop={(e) => handleSelectElement(el.id, e)}
             >
-              <div
-                ref={el.nodeRef}
-                className={`draggable-text ${selectedElement === el.id ? "selected" : ""}`}
-                onClick={() => handleSelectElement(el.id)}
-              >
-                <input
-                  type="text"
-                  value={el.text}
-                  onChange={(e) => handleTextChange(el.id, e.target.value)}
-                  className="editable-text"
-                />
-              </div>
+              {el.type === "image" ? (
+                <div
+                  ref={el.nodeRef}
+                  className={`draggable-element ${selectedElement === el.id ? "selected" : ""}`}
+                  onClick={(e) => handleSelectElement(el.id, e)}
+                  style={{ position: "absolute", width: el.width, height: el.height }}
+                >
+                  <img
+                    src={el.src}
+                    alt="Uploaded"
+                    draggable={false}
+                    style={{ width: "100%", height: "100%", cursor: "move" }}
+                  />
+                </div>
+              ) : (
+                <div 
+                  ref={el.nodeRef}
+                  className={`draggable-text ${selectedElement === el.id ? "selected" : ""}`}
+                  onClick={(e) => handleSelectElement(el.id, e)}
+                  onDoubleClick={(e) => handleTextDoubleClick(el.id, e)}
+                >
+                  {editingText === el.id ? (
+                    <textarea
+                      ref={textRef}
+                      value={el.text}
+                      onChange={(e) => handleTextChange(el.id, e.target.value)}
+                      onBlur={handleTextBlur}
+                      onKeyDown={handleKeyDown}
+                      className={`editable-text ${el.className}`}
+                      autoFocus
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        outline: 'none',
+                        resize: 'both',
+                        minWidth: '100px',
+                        minHeight: '20px',
+                        overflow: 'hidden'
+                      }}
+                    />
+                  ) : (
+                    <div className={`editable-text ${el.className}`}>
+                      {el.text}
+                    </div>
+                  )}
+                </div>
+              )}
             </Draggable>
           ))}
         </div>
